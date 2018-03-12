@@ -177,23 +177,30 @@
   :ok)
 
 (defn current-classpath
-  []
-  (vec (.split ^String
-               (System/getProperty "java.class.path")
-               (System/getProperty "path.separator"))))
+  ([] (current-classpath (System/getProperty "java.class.path")))
+  ([^String cp]
+   (vec (.split cp (System/getProperty "path.separator")))))
 
 (defn depstar-itself?
   [p]
   (re-find #"depstar" p))
 
 (defn run
-  [{:keys [dest] :as options}]
+  [{:keys [dest class-path] :as options}]
   (let [tmp (Files/createTempDirectory "uberjar" (make-array FileAttribute 0))
-        cp (into [] (remove depstar-itself?) (current-classpath))]
+        cp (into [] (remove depstar-itself?) (if class-path
+                                               (current-classpath class-path)
+                                               (current-classpath)))]
     (run! #(copy-source % tmp options) cp)
     (println "Writing jar...")
     (write-jar tmp (path dest))))
 
 (defn -main
-  [destination]
-  (run {:dest destination}))
+  ([destination]
+   (run {:dest destination}))
+  ([destination class-path]
+   (when (not (.endsWith ^String destination ".jar"))
+     (throw (ex-info "Destination should end with .jar" {:destination destination
+                                                         :class-path class-path})))
+   (run {:dest destination
+         :class-path class-path})))
